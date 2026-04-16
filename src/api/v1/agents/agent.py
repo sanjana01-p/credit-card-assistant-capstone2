@@ -174,15 +174,16 @@ def router_node(state: RAGState) -> RAGState:
         (
             "system",
             """You are a query router for an agentic RAG system.
-            Classify the user's query into EXACTLY one of two routes:
+            Classify the user's query into EXACTLY one of three routes:
 
-            "product"  — the query asks about products, product prices, stock/inventory,
+            "product"  — the query asks about products, product prices, stock/inventory, summarize spending, transactions,
                         product categories, customer orders, order items, or anything
                         answerable from a structured e-commerce database with tables:
                         products, categories, orders, order_items.
 
             "document" — the query asks about policies, procedures, guidelines,
                         regulations, or any topic that requires reading text documents.
+                        if user asks to give any sql query.
 
             "hybrid" - the query asks about both the products, product prices, stock/inventory,
                         product categories, customer orders, order items, or anything
@@ -394,7 +395,7 @@ def search_result_node(state: RAGState) -> RAGState:
     query = state.get("query", "")
     if isinstance(query, list):
         query = " ".join(str(q) for q in query)
-
+    # ✅ IMAGE QUERY BRANCH
     if is_image_query(state["query"]):
         print("[search_result_node] 🖼️ Image query detected")
 
@@ -486,6 +487,7 @@ def guardrail_node(state: RAGState) -> RAGState:
         "- Tables, charts, figures, or images present in internal documents\n"
         "- Requests to retrieve or display content (text, table, image) from documents\n\n"
         "OUT-OF-SCOPE includes:\n"
+        "-SQL queries asked by user should be denied saying cannot give sql queries if user asks like 'give me this sql query' or 'give me query'"
         "- Chit-chat\n"
         "- Personal questions\n"
         "- Pure software tutorials unrelated to document content\n\n"
