@@ -238,7 +238,7 @@ def similarity_search(
 
     Returns:
         List of dicts with keys: content, chunk_type, page_number, section,
-        source_file, element_type, image_base64, mime_type, position,
+        image_path, source_file, element_type, image_base64, mime_type, position, 
         metadata, similarity (0–1 cosine similarity score).
 
     The <=> operator is pgvector's cosine distance operator.
@@ -253,7 +253,7 @@ def similarity_search(
 
     sql = f"""
         SELECT
-            content, chunk_type, page_number, section,
+            content, chunk_type, page_number, section, image_path,
             source_file, element_type, image_path, mime_type,
             position, metadata,
             1 - (embedding <=> %(vec)s::vector) AS similarity
@@ -272,7 +272,7 @@ def similarity_search(
     results = []
     for row in rows:
         row = dict(row)
-        img_path = row.pop("image_path", None)
+        img_path = row.get("image_path")
         if img_path and os.path.exists(img_path):
             row["image_base64"] = base64.b64encode(
                 pathlib.Path(img_path).read_bytes()
@@ -297,7 +297,7 @@ def get_all_chunks(chunk_type: str | None = None, limit: int = 200) -> list[dict
 
     Returns:
         List of dicts with keys: id, content, chunk_type, page_number,
-        section, source_file, element_type, image_base64, mime_type,
+        section, source_file, image_path, element_type, image_base64, mime_type,
         position, metadata.
     """
     type_clause = "WHERE chunk_type = %(chunk_type)s" if chunk_type else ""
@@ -305,7 +305,7 @@ def get_all_chunks(chunk_type: str | None = None, limit: int = 200) -> list[dict
     sql = f"""
         SELECT
             id, content, chunk_type, page_number, section,
-            source_file, element_type, image_path, mime_type,
+            source_file, image_path, element_type, image_path, mime_type,
             position, metadata
         FROM multimodal_chunks
         {type_clause}
@@ -321,7 +321,7 @@ def get_all_chunks(chunk_type: str | None = None, limit: int = 200) -> list[dict
     results = []
     for row in rows:
         row = dict(row)
-        img_path = row.pop("image_path", None)
+        img_path = row.get("image_path")
         if img_path and os.path.exists(img_path):
             row["image_base64"] = base64.b64encode(
                 pathlib.Path(img_path).read_bytes()
