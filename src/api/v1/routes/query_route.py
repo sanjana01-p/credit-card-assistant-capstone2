@@ -69,6 +69,7 @@ async def query_stream(request: QueryRequest):
 
         final_state = rag_graph.invoke(initial_state)
 
+        #  Extract ONLY answer text
         response_obj = final_state.get("response")
 
         if isinstance(response_obj, dict):
@@ -89,8 +90,7 @@ async def query_stream(request: QueryRequest):
         has_sql = bool(generated_sql or sql_result)
         has_docs = bool(reranked_docs)
 
-
-   
+      
 
         if final_answer and not reranked_docs:
             yield json.dumps({
@@ -107,8 +107,8 @@ async def query_stream(request: QueryRequest):
                 }]
             }) + "\n"
 
-            return  
-        
+            return 
+
 
         
         if final_answer and (has_sql or has_docs):
@@ -158,13 +158,15 @@ async def query_stream(request: QueryRequest):
         page_match = re.search(r"page\s*(\d+)", q)
         requested_page = int(page_match.group(1)) if page_match else None
 
-        
+        # --------------------------------------------------
+        # 3. FORCE IMAGE RETRIEVAL
+        # --------------------------------------------------
         forced_image_docs = []
 
         if is_image_query:
             image_rows = similarity_search(
                 query=request.query,
-                k=5,
+                k=3,
                 chunk_type="image"
             )
 
@@ -188,6 +190,8 @@ async def query_stream(request: QueryRequest):
                     "mime_type": row.get("mime_type", "image"),
                 })
 
+        forced_image_docs = forced_image_docs[:1]
+       
         if is_explain_image and forced_image_docs:
             context = "\n\n".join(doc.page_content for doc in reranked_docs)
 
@@ -213,7 +217,6 @@ async def query_stream(request: QueryRequest):
                 }) + "\n"
             return
 
-        
         if is_image_query and forced_image_docs:
             yield json.dumps({
                 "type": "text",
@@ -231,7 +234,9 @@ async def query_stream(request: QueryRequest):
                 }) + "\n"
             return
 
-        
+        # --------------------------------------------------
+        # 4. NORMAL RAG TEXT STREAMING
+        # --------------------------------------------------
         context = "\n\n".join(doc.page_content for doc in reranked_docs)
 
         async for token in stream_final_answer(context, request.query):
@@ -247,7 +252,9 @@ async def query_stream(request: QueryRequest):
                 "content": token
             }) + "\n"
 
-      
+        # --------------------------------------------------
+        # 5. Send Retrieved Chunks
+        # --------------------------------------------------
         chunks_payload = []
         for doc in reranked_docs:
             chunks_payload.append({
